@@ -1,0 +1,224 @@
+---
+title: "Optimizing Workout Sequences: A Genetic Algorithm Approach to Balancing Muscle Group Training"
+author: "Varun Sridhar"
+output:
+  html_document:
+    theme: cosmo
+    toc: true
+    toc_float: true
+    toc_depth: 2
+    code_folding: show
+---
+
+```{r setup, echo=FALSE}
+# Set global chunk options
+knitr::opts_chunk$set(warning = FALSE, 
+                      message = FALSE,
+                      fig.width=12,
+                      fig.height=8)
+```
+
+# Libraries
+
+```{r libraries}
+# To load necessary libraries
+library(tidyverse)  # Loads ggplot2, dplyr, tidyr, readr, and more
+library(GA)  # For genetic algorithm
+library(tidyr)
+```
+
+# Introduction
+
+Effective workout plans ensure that all major muscle groups are trained in a balanced manner, leading to better overall fitness and injury prevention. However, designing a workout plan that optimizes muscle group engagement is a complex problem, especially when taking into account various muscle groups, individual goals, and exercise preferences.
+
+This project leverages a **genetic algorithm** to optimize workout sequences, aiming to balance exercises across multiple muscle groups. Genetic algorithms are heuristic optimization techniques inspired by natural selection. They are especially useful for solving combinatorial problems like optimizing workout plans, as they explore a wide solution space and can arrive at near-optimal solutions in a reasonable time.
+
+# Methodology
+
+## Data Source
+
+The dataset used in this project was sourced from [Kaggle](https://www.kaggle.com/datasets/willianoliveiragibin/gym-exercises?resource=download). It contains information on various gym exercises and the muscle groups they target. The goal is to use this dataset to optimize a workout plan that covers as many unique muscle groups as possible, ensuring balanced muscle engagement.
+
+## Loading the Dataset
+
+```{r}
+# Load the dataset
+exercise_data <- read.csv("data/stretch_exercise_dataset new.csv")
+```
+
+## Data Cleaning
+
+To ensure clean data, NA values are removed, and white spaces in character columns are trimmed.
+
+```{r}
+# Clean the data by removing NA values and trimming white spaces in character columns
+exercise_data <- exercise_data %>%
+  mutate(across(where(is.character), trimws)) %>%
+  drop_na()
+```
+
+## Basic Data Analysis
+
+```{r}
+# Count the number of exercises per muscle group
+muscle_group_counts <- exercise_data %>%
+  count(Target_Muscles, sort = TRUE)  # Sorting by count
+
+# Display the counts
+print(muscle_group_counts)
+```
+
+## Genetic Algorithm Optimization
+
+The genetic algorithm is designed to select a subset of exercises that maximizes muscle group coverage. The chromosome in this algorithm represents a binary vector where each gene indicates whether an exercise is included or excluded from the plan.
+
+Key Parameters:
+
+-   **Population Size (`popSize`)**: We chose 50 as a moderate size to balance between computational efficiency and solution diversity.
+
+-   **Max Iterations (`maxiter`)**: Set to 100 to ensure the algorithm converges.
+
+-   **Mutation Probability (`pmutation`)**: Set to 0.01 to introduce occasional variation in the population.
+
+```{r}
+# Define the fitness function for the genetic algorithm
+# Here, the fitness function aims to balance the muscle group coverage
+fitness_function <- function(chromosome) {
+  # Assuming chromosome is a binary vector where each element represents whether an exercise is selected (1) or not (0)
+  selected_exercises <- exercise_data[chromosome == 1, ]
+  muscle_coverage <- length(unique(selected_exercises$Target_Muscles))
+  return(muscle_coverage)
+}
+
+ga_result <- ga(type = "binary", fitness = fitness_function, 
+                nBits = nrow(exercise_data), popSize = 50, maxiter = 100, 
+                pmutation = 0.01, elitism = TRUE)
+
+# Extract the best solution
+best_solution <- exercise_data[ga_result@solution == 1, ]
+```
+
+# Visualizing Optimized Workout Plan
+
+The optimized workout plan includes a set of exercises that target a range of muscle groups. Below is the distribution of exercises across different muscle groups in the optimized plan.
+
+```{r}
+# Remove rows with NA in Target_Muscles if present
+best_solution_clean <- best_solution %>%
+  filter(!is.na(Target_Muscles))
+
+# Analyze the distribution of targeted muscle groups in the best solution
+optimized_muscle_groups <- best_solution_clean %>%
+  count(Target_Muscles) %>%
+  arrange(desc(n))
+
+# Visualize the distribution of muscle groups with enhancements
+ggplot(optimized_muscle_groups, aes(x = reorder(Target_Muscles, -n), y = n, fill = n)) +
+  geom_bar(stat = "identity", width = 0.7) +
+  geom_text(aes(label = n), vjust = -0.5, size = 3.5) +  # Add data labels
+  labs(title = "Distribution of Muscle Groups in the Optimized Workout Plan", 
+       x = "Muscle Group", 
+       y = "Number of Exercises") +
+  scale_fill_viridis_c(option = "C") +  # Use viridis color scale for clarity
+  theme_minimal(base_size = 14) +
+  theme(axis.text.x = element_text(angle = 60, hjust = 1, vjust = 1),  # Rotate x labels
+        plot.title = element_text(hjust = 0.5, size = 16, face = "bold"))  # Bold title and center
+
+
+```
+
+# Analysis of the Muscle Group Distribution
+
+The plot above displays the distribution of exercises across various muscle groups in the optimized workout plan. Here are the key takeaways from the analysis:
+
+### High Emphasis on Lower Body Muscle Groups
+
+-   **Hamstrings** have the highest representation with 9 exercises, followed by **Adductors (Hip)** and **Gluteus Maximus** with 8 and 5 exercises, respectively.
+
+-   This suggests that the optimized workout plan places significant emphasis on lower-body muscle groups, making it highly effective for individuals focusing on lower body strength, stability, or injury recovery.
+
+### Balanced Mid-Range Representation
+
+-   Muscle groups such as **Latissimus Dorsi**, **Adductor Magnus**, **Iliopsoas**, **Quadratus Femoris**, and **Gluteus Medius** have between 3 to 5 exercises targeting them.
+
+-   This indicates that these muscle groups are moderately covered in the workout plan, contributing to a more balanced workout regime overall, ensuring that a variety of upper and lower body muscles are targeted.
+
+### Underrepresented Muscle Groups
+
+-   A number of muscle groups, including **Brachioradialis**, **Deltoid (Lateral and Posterior)**, **Wrist Flexors**, and **Triceps (Long Head)**, are only represented by one or two exercises.
+
+-   While these muscle groups are still included, the lower representation might suggest a lack of emphasis on smaller or more specialized muscle groups, which could be a point of improvement depending on the user's specific fitness goals.
+
+### Imbalance Between Upper and Lower Body Exercises
+
+-   The distribution skews towards the **lower body**, with muscle groups like **Hamstrings**, **Gluteus Maximus**, and **Adductors** receiving more attention compared to upper body groups like **Biceps Brachii**, **Deltoid**, and **Wrist Flexors**.
+
+-   This may indicate that the optimized workout plan is more suited for leg and lower-body-focused training programs, potentially at the expense of upper-body development.
+
+### Actionable Insights for Program Optimization
+
+-   If the goal is a **full-body workout**, adjustments might be needed to increase the emphasis on underrepresented muscle groups, especially those in the upper body.
+
+-   On the other hand, for someone aiming to improve **lower-body strength** or **endurance**, the current distribution is well-optimized.
+
+### Visual Representation
+
+-   The color gradient from **yellow to purple** visually represents the number of exercises per muscle group, with yellow indicating the highest number and purple representing the lowest. This makes it easy to spot the focus areas of the workout plan at a glance.
+
+-   The data labels above each bar also improve clarity, allowing readers to quickly interpret the exact number of exercises targeting each muscle group.
+
+# Finalizing and Analyzing the Optimized Workout Plan
+
+```{r}
+# Check the number of unique muscle groups in the optimized plan
+num_unique_muscle_groups <- n_distinct(optimized_muscle_groups$Target_Muscles)
+print(paste("Number of unique muscle groups covered in the optimized workout plan:", num_unique_muscle_groups))
+
+# Analyze the balance of muscle groups
+total_exercises <- sum(optimized_muscle_groups$n)
+print(paste("Total number of exercises in the optimized plan:", total_exercises))
+
+# Calculate the percentage coverage for each muscle group
+optimized_muscle_groups <- optimized_muscle_groups %>%
+  mutate(percentage = (n / total_exercises) * 100)
+
+# View the muscle group distribution with percentage coverage
+print(optimized_muscle_groups)
+```
+
+# Saving the results
+
+```{r}
+# Save the entire workspace to an RData file
+save.image("optimized_workout_workspace.RData")
+```
+
+# Saving the Plot:
+
+```{r}
+# Save the plot as a PNG file
+ggsave("optimized_workout_distribution.png", width = 10, height = 6, dpi = 300)
+```
+
+# Saving the Optimized Workout Plan:
+
+```{r}
+# Save the optimized workout plan as a CSV file
+write.csv(best_solution_clean, "optimized_workout_plan.csv", row.names = FALSE)
+```
+
+# Conclusion
+
+This project successfully utilized a genetic algorithm to optimize a workout plan by balancing exercises across multiple muscle groups. The optimized plan shows a strong emphasis on lower-body muscle groups, with **Hamstrings**, **Adductors**, and **Gluteus Maximus** receiving the highest number of exercises. While the lower body is well-represented, the upper body, particularly muscle groups like **Biceps Brachii**, **Deltoids**, and **Wrist Flexors**, is underrepresented.
+
+The key strengths of the optimized plan are its ability to provide a balanced lower-body workout, making it ideal for individuals focusing on leg strength, stability, or endurance. The inclusion of moderate coverage for other muscle groups ensures that the plan remains comprehensive, albeit skewed towards certain body parts.
+
+### Future Improvements:
+
+-   **Balanced Upper and Lower Body Training**: To create a more well-rounded full-body workout, future iterations of the optimization could incorporate weighting schemes in the fitness function to ensure that upper-body muscles are more proportionally represented.
+
+-   **Personalization**: The optimization process can be further refined by integrating user-specific preferences or training goals, such as strength-building, hypertrophy, or endurance. Adjusting the fitness function to prioritize certain muscle groups or exercise types based on individual needs could lead to even more tailored and effective workout plans.
+
+-   **Incorporating Recovery**: Future models could incorporate rest or recovery periods, ensuring that specific muscle groups are not overworked while maintaining overall exercise variety.
+
+Overall, the genetic algorithm approach has proven to be a valuable method for generating optimized workout plans, enabling balanced muscle group engagement while addressing specific training needs. By continuously refining the algorithm and introducing user-specific customization, this approach can be adapted for various fitness goals, making it a versatile tool in workout programming.
