@@ -8,7 +8,7 @@ This project utilizes a genetic algorithm to optimize workout sequences, aiming 
 
 The dataset used in this project is sourced from Kaggle. It contains information on various gym exercises and the muscle groups they target.
 
-#Methodology
+# Methodology
 
 - Data Loading: The dataset is loaded and cleaned to remove NA values and white spaces.
 - Basic Data Analysis: A preliminary analysis of exercise counts per muscle group is performed.
